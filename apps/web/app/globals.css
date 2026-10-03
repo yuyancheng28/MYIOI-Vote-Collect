@@ -1,0 +1,250 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+
+const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+type User = {
+  id: string;
+  username: string;
+  role: 'owner' | 'admin' | 'user';
+};
+
+type Poll = {
+  id: string;
+  title: string;
+  description: string;
+  created_by: string;
+  total_votes: number;
+};
+
+type PollDetail = {
+  id: string;
+  title: string;
+  description: string;
+};
+
+export default function Page() {
+  const [username, setUsername] = useState('admin');
+  const [password, setPassword] = useState('password123');
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [polls, setPolls] = useState<Poll[]>([]);
+  const [pollTitle, setPollTitle] = useState('Weekly meeting time');
+  const [pollDescription, setPollDescription] = useState('Please choose a time for the next meeting.');
+  const [pollOptions, setPollOptions] = useState('Monday 18:00, Wednesday 18:00, Friday 19:00');
+  const [selectedPollId, setSelectedPollId] = useState<string | null>(null);
+  const [selectedOptionId, setSelectedOptionId] = useState<string>('');
+  const [pollDetails, setPollDetails] = useState<PollDetail | null>(null);
+  const [options, setOptions] = useState<{ id: string; text: string }[]>([]);
+  const [results, setResults] = useState<{ id: string; text: string; vote_count: number }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const authHeaders = useMemo(() => ({
+    Authorization: token ? `Bearer ${token}` : '',
+    'Content-Type': 'application/json',
+  }), [token]);
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem('myioi-token');
+    if (savedToken) {
+      setToken(savedToken);
+      fetch(`${apiBase}/auth/me`, { headers: { Authorization: `Bearer ${savedToken}` } })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.user) {
+            setUser(data.user);
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('myioi-token');
+        });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    loadPolls();
+  }, [token]);
+
+  async function login() {
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Login failed');
+
+      localStorage.setItem('myioi-token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } catch (error: any) {
+      alert(error.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadPolls() {
+    const res = await fetch(`${apiBase}/polls`, { headers: authHeaders });
+    if (!res.ok) return;
+    const data = await res.json();
+    setPolls(data.polls || []);
+  }
+
+  async function createPoll() {
+    if (!token) return alert('Please log in first');
+
+    const payload = {
+      title: pollTitle,
+      description: pollDescription,
+      options: pollOptions.split(',').map((item) => item.trim()).filter(Boolean),
+    };
+
+    const res = await fetch(`${apiBase}/polls`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) return alert(data.message || 'Failed to create poll');
+    alert('Poll created successfully');
+    setPollTitle('');
+    setPollDescription('');
+    setPollOptions('');
+    await loadPolls();
+  }
+
+  async function openPoll(id: string) {
+    setSelectedPollId(id);
+    const res = await fetch(`${apiBase}/polls/${id}`, { headers: authHeaders });
+    const data = await res.json();
+    if (!res.ok) return alert(data.message || 'Failed to load poll');
+    setPollDetails(data.poll);
+    setOptions(data.options || []);
+
+    const resultRes = await fetch(`${apiBase}/polls/${id}/results`, { headers: authHeaders });
+    if (resultRes.ok) {
+      const resultData = await resultRes.json();
+      setResults(resultData.results || []);
+    }
+  }
+
+  async function vote() {
+    if (!selectedPollId || !selectedOptionId) {
+      return alert('Please select an option to vote.');
+    }
+
+    const res = await fetch(`${apiBase}/polls/${selectedPollId}/vote`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ optionId: selectedOptionId }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) return alert(data.message || 'Failed to vote');
+    alert('Vote submitted successfully');
+    await openPoll(selectedPollId);
+    await loadPolls();
+  }
+
+  return (
+    <main className="page-shell">
+      <div className="container">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">MYIOI Vote Collect</p>
+            <h1>Online voting system</h1>
+          </div>
+
+          {user ? (
+            <div className="user-badge">
+              <span>{user.username}</span>
+              <strong>{user.role}</strong>
+            </div>
+          ) : (
+            <div className="user-badge login-box">
+              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" />
+              <button onClick={login} disabled={loading}>{loading ? 'Logging in...' : 'Login'}</button>
+            </div>
+          )}
+        </header>
+
+        <section className="grid two-col">
+          <div className="card">
+            <h2>Create poll</h2>
+            <label>
+              Title
+              <input value={pollTitle} onChange={(e) => setPollTitle(e.target.value)} />
+            </label>
+            <label>
+              Description
+              <textarea value={pollDescription} onChange={(e) => setPollDescription(e.target.value)} />
+            </label>
+            <label>
+              Options (comma separated)
+              <textarea value={pollOptions} onChange={(e) => setPollOptions(e.target.value)} />
+            </label>
+            <button onClick={createPoll} className="primary">Create poll</button>
+          </div>
+
+          <div className="card">
+            <h2>Poll list</h2>
+            <div className="poll-list">
+              {polls.length === 0 ? (
+                <p>No polls yet.</p>
+              ) : (
+                polls.map((poll) => (
+                  <button key={poll.id} className="poll-item" onClick={() => openPoll(poll.id)}>
+                    <strong>{poll.title}</strong>
+                    <span>{poll.total_votes} votes</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+
+        {selectedPollId && pollDetails && (
+          <section className="card vote-panel">
+            <h2>{pollDetails.title}</h2>
+            <p>{pollDetails.description}</p>
+            <div className="vote-form">
+              {options.map((option) => (
+                <label key={option.id} className="option-row">
+                  <input
+                    type="radio"
+                    name="voteOption"
+                    value={option.id}
+                    checked={selectedOptionId === option.id}
+                    onChange={() => setSelectedOptionId(option.id)}
+                  />
+                  <span>{option.text}</span>
+                </label>
+              ))}
+            </div>
+            <button className="primary" onClick={vote}>Submit vote</button>
+
+            {results.length > 0 && (
+              <div className="results-box">
+                <h3>Results</h3>
+                {results.map((result) => (
+                  <div key={result.id} className="result-row">
+                    <span>{result.text}</span>
+                    <strong>{result.vote_count}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+    </main>
+  );
+}
