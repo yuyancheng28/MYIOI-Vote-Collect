@@ -1,75 +1,111 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const { randomUUID } = require('crypto');
 const db = require('../db');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
-router.post('/login', (req, res) => {
-  const { username, password } = req.body || {};
+router.get('/', requireAuth, (req, res) => {
+  const polls = db.prepare(`
+    SELECT p.*, COUNT(v.id) AS total_votes
+    FROM polls p
+    LEFT JOIN votes v ON v.poll_id = p.id
+    GROUP BY p.id
+    ORDER BY p.created_at DESC
+  `).all();
 
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Username and password are required.' });
-  }
-
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-
-  if (!user) {
-    return res.status(401).json({ message: 'Invalid credentials' });
-  }
-
-  const isMatch = bcrypt.compareSync(password, user.password_hash);
-
-  if (!isMatch) {
-    return res.status(401).json({ message: 'Invalid credentials' });
-  }
-
-  const token = jwt.sign(
-    { id: user.id, username: user.username, role: user.role },
-    process.env.JWT_SECRET || 'dev-secret',
-    { expiresIn: '7d' }
-  );
-
-  return res.json({
-    token,
-    user: { id: user.id, username: user.username, role: user.role }
-  });
+  return res.json({ polls });
 });
 
-router.get('/me', (req, res) => {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+router.post('/', requireAuth, requireRole('admin', 'owner'), (req, res) => {
+  const { title, description, options } = req.body || {};
 
-  if (!token) {
-    return res.status(401).json({ message: 'Unauthorized' });
+  if (!title || !Array.isArray(options) || options.length < 2) {
+    return res.status(400).json({ message: 'Title and at least 2 options are required.' });
   }
 
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
-    return res.json({ user: payload });
-  } catch (error) {
-    return res.status(401).json({ message: 'Invalid token' });
+  const cleanedOptions = options.map((option) => String(option).trim()).filter(Boolean);
+
+  if (cleanedOptions.length < 2) {
+    return res.status(400).json({ message: 'Each option must contain a non-empty value.' });
   }
+
+  const pollId = randomUUID();
+
+  db.transaction(() => {
+    db.prepare(`
+      INSERT INTO polls (id, title, description, created_by, created_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).run(pollId, title, description || '', req.user.id);
+
+    const insertOption = db.prepare(`
+      INSERT INTO poll_options (id, poll_id, text, created_at)
+      VALUES (?, ?, ?, datetime('now'))
+    `);
+
+    for (const option of cleanedOptions) {
+      insertOption.run(randomUUID(), pollId, option);
+    }
+  })();
+
+  return res.status(201).json({ message: 'Poll created successfully', pollId });
 });
 
-router.get('/github-url', (req, res) => {
-  const clientId = process.env.GITHUB_CLIENT_ID || 'demo_client_id';
-  const redirectUri = encodeURIComponent(process.env.GITHUB_REDIRECT_URI || 'http://localhost:4000/api/auth/github/callback');
-  const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user,user:email`;
-  return res.json({ url });
-});
-
-router.get('/github/callback', (req, res) => {
-  const { code } = req.query;
-
-  if (!code) {
-    return res.status(400).json({ message: 'Missing GitHub code.' });
+router.get('/:id', requireAuth, (req, res) => {
+  const poll = db.prepare('SELECT * FROM polls WHERE id = ?').get(req.params.id);
+  if (!poll) {
+    return res.status(404).json({ message: 'Poll not found' });
   }
 
-  return res.json({
-    message: 'GitHub OAuth callback received. Please connect this endpoint to a real GitHub OAuth flow.',
-    code
-  });
+  const options = db.prepare('SELECT * FROM poll_options WHERE poll_id = ? ORDER BY created_at').all(req.params.id);
+  return res.json({ poll, options });
+});
+
+router.post('/:id/vote', requireAuth, (req, res) => {
+  const pollId = req.params.id;
+  const { optionId } = req.body || {};
+
+  const poll = db.prepare('SELECT * FROM polls WHERE id = ?').get(pollId);
+  if (!poll) {
+    return res.status(404).json({ message: 'Poll not found' });
+  }
+
+  const option = db.prepare('SELECT * FROM poll_options WHERE id = ? AND poll_id = ?').get(optionId, pollId);
+  if (!option) {
+    return res.status(400).json({ message: 'Invalid option' });
+  }
+
+  const existingVote = db.prepare('SELECT * FROM votes WHERE poll_id = ? AND user_id = ?').get(pollId, req.user.id);
+  if (existingVote) {
+    return res.status(400).json({ message: 'You have already voted in this poll.' });
+  }
+
+  db.prepare(`
+    INSERT INTO votes (id, poll_id, option_id, user_id, created_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+  `).run(randomUUID(), pollId, optionId, req.user.id);
+
+  return res.json({ message: 'Vote submitted successfully' });
+});
+
+router.get('/:id/results', requireAuth, requireRole('admin', 'owner'), (req, res) => {
+  const poll = db.prepare('SELECT * FROM polls WHERE id = ?').get(req.params.id);
+  if (!poll) {
+    return res.status(404).json({ message: 'Poll not found' });
+  }
+
+  const resultRows = db.prepare(`
+    SELECT o.id, o.text, COUNT(v.id) AS vote_count
+    FROM poll_options o
+    LEFT JOIN votes v ON v.option_id = o.id
+    WHERE o.poll_id = ?
+    GROUP BY o.id, o.text
+    ORDER BY o.created_at ASC
+  `).all(req.params.id);
+
+  const totalVotes = resultRows.reduce((sum, row) => sum + Number(row.vote_count || 0), 0);
+
+  return res.json({ poll, results: resultRows, totalVotes });
 });
 
 module.exports = router;

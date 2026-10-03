@@ -11,7 +11,7 @@ function requireAuth(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
     req.user = decoded;
-    next();
+    return next();
   } catch (error) {
     return res.status(401).json({ message: 'Invalid token' });
   }
@@ -27,7 +27,7 @@ function requireRole(...allowedRoles) {
       return res.status(403).json({ message: 'Forbidden: insufficient permissions' });
     }
 
-    next();
+    return next();
   };
 }
 

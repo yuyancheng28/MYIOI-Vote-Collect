@@ -7,6 +7,8 @@ const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../data/vot
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 const db = new Database(dbPath);
+db.pragma('foreign_keys = ON');
+
 const schemaSql = fs.readFileSync(path.join(__dirname, '../../database/schema.sql'), 'utf8');
 db.exec(schemaSql);
 
@@ -17,13 +19,13 @@ function seedDemoUsers() {
     { username: 'user', password: 'password123', role: 'user' }
   ];
 
-  const stmt = db.prepare(`
+  const insert = db.prepare(`
     INSERT OR IGNORE INTO users (id, username, password_hash, role, created_at)
     VALUES (@id, @username, @password_hash, @role, datetime('now'))
   `);
 
   for (const user of defaultUsers) {
-    stmt.run({
+    insert.run({
       id: require('crypto').randomUUID(),
       username: user.username,
       password_hash: bcrypt.hashSync(user.password, 10),

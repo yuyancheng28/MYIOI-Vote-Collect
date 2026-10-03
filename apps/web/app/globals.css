@@ -1,250 +1,178 @@
-'use client';
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: Arial, Helvetica, sans-serif;
+}
 
-import { useEffect, useMemo, useState } from 'react';
+* {
+  box-sizing: border-box;
+}
 
-const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+button, input, textarea {
+  font: inherit;
+}
 
-type User = {
-  id: string;
-  username: string;
-  role: 'owner' | 'admin' | 'user';
-};
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  background: #334155;
+  color: white;
+}
 
-type Poll = {
-  id: string;
-  title: string;
-  description: string;
-  created_by: string;
-  total_votes: number;
-};
+button.primary {
+  background: linear-gradient(135deg, #38bdf8, #8b5cf6);
+  font-weight: 700;
+}
 
-type PollDetail = {
-  id: string;
-  title: string;
-  description: string;
-};
+button.active {
+  outline: 2px solid #38bdf8;
+}
 
-export default function Page() {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('password123');
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [polls, setPolls] = useState<Poll[]>([]);
-  const [pollTitle, setPollTitle] = useState('Weekly meeting time');
-  const [pollDescription, setPollDescription] = useState('Please choose a time for the next meeting.');
-  const [pollOptions, setPollOptions] = useState('Monday 18:00, Wednesday 18:00, Friday 19:00');
-  const [selectedPollId, setSelectedPollId] = useState<string | null>(null);
-  const [selectedOptionId, setSelectedOptionId] = useState<string>('');
-  const [pollDetails, setPollDetails] = useState<PollDetail | null>(null);
-  const [options, setOptions] = useState<{ id: string; text: string }[]>([]);
-  const [results, setResults] = useState<{ id: string; text: string; vote_count: number }[]>([]);
-  const [loading, setLoading] = useState(false);
+.page-shell {
+  min-height: 100vh;
+  padding: 32px 16px;
+  display: flex;
+  justify-content: center;
+}
 
-  const authHeaders = useMemo(() => ({
-    Authorization: token ? `Bearer ${token}` : '',
-    'Content-Type': 'application/json',
-  }), [token]);
+.container {
+  width: min(1100px, 100%);
+}
 
-  useEffect(() => {
-    const savedToken = localStorage.getItem('myioi-token');
-    if (savedToken) {
-      setToken(savedToken);
-      fetch(`${apiBase}/auth/me`, { headers: { Authorization: `Bearer ${savedToken}` } })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.user) {
-            setUser(data.user);
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem('myioi-token');
-        });
-    }
-  }, []);
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
 
-  useEffect(() => {
-    if (!token) return;
-    loadPolls();
-  }, [token]);
+.eyebrow {
+  color: #7dd3fc;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+}
 
-  async function login() {
-    setLoading(true);
-    try {
-      const res = await fetch(`${apiBase}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+h1, h2, h3, p {
+  margin-top: 0;
+}
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login failed');
+.card {
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
+}
 
-      localStorage.setItem('myioi-token', data.token);
-      setToken(data.token);
-      setUser(data.user);
-    } catch (error: any) {
-      alert(error.message || 'Login failed');
-    } finally {
-      setLoading(false);
-    }
-  }
+.auth-card {
+  max-width: 480px;
+}
 
-  async function loadPolls() {
-    const res = await fetch(`${apiBase}/polls`, { headers: authHeaders });
-    if (!res.ok) return;
-    const data = await res.json();
-    setPolls(data.polls || []);
-  }
+label {
+  display: block;
+  margin-bottom: 14px;
+  color: #dbeaf9;
+  font-size: 14px;
+}
 
-  async function createPoll() {
-    if (!token) return alert('Please log in first');
+input, textarea {
+  width: 100%;
+  display: block;
+  margin-top: 6px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.75);
+  color: white;
+}
 
-    const payload = {
-      title: pollTitle,
-      description: pollDescription,
-      options: pollOptions.split(',').map((item) => item.trim()).filter(Boolean),
-    };
+textarea {
+  min-height: 90px;
+  resize: vertical;
+}
 
-    const res = await fetch(`${apiBase}/polls`, {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify(payload),
-    });
+.grid {
+  display: grid;
+  gap: 20px;
+}
 
-    const data = await res.json();
-    if (!res.ok) return alert(data.message || 'Failed to create poll');
-    alert('Poll created successfully');
-    setPollTitle('');
-    setPollDescription('');
-    setPollOptions('');
-    await loadPolls();
-  }
+.two-col {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
 
-  async function openPoll(id: string) {
-    setSelectedPollId(id);
-    const res = await fetch(`${apiBase}/polls/${id}`, { headers: authHeaders });
-    const data = await res.json();
-    if (!res.ok) return alert(data.message || 'Failed to load poll');
-    setPollDetails(data.poll);
-    setOptions(data.options || []);
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.8);
+}
 
-    const resultRes = await fetch(`${apiBase}/polls/${id}/results`, { headers: authHeaders });
-    if (resultRes.ok) {
-      const resultData = await resultRes.json();
-      setResults(resultData.results || []);
-    }
-  }
+.login-box {
+  display: flex;
+  align-items: center;
+}
 
-  async function vote() {
-    if (!selectedPollId || !selectedOptionId) {
-      return alert('Please select an option to vote.');
-    }
+.poll-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
-    const res = await fetch(`${apiBase}/polls/${selectedPollId}/vote`, {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({ optionId: selectedOptionId }),
-    });
+.poll-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(30, 41, 59, 0.9);
+  padding: 12px 14px;
+}
 
-    const data = await res.json();
-    if (!res.ok) return alert(data.message || 'Failed to vote');
-    alert('Vote submitted successfully');
-    await openPoll(selectedPollId);
-    await loadPolls();
-  }
+.vote-section {
+  margin-top: 24px;
+}
 
-  return (
-    <main className="page-shell">
-      <div className="container">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">MYIOI Vote Collect</p>
-            <h1>Online voting system</h1>
-          </div>
+.vote-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0 20px;
+}
 
-          {user ? (
-            <div className="user-badge">
-              <span>{user.username}</span>
-              <strong>{user.role}</strong>
-            </div>
-          ) : (
-            <div className="user-badge login-box">
-              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" />
-              <button onClick={login} disabled={loading}>{loading ? 'Logging in...' : 'Login'}</button>
-            </div>
-          )}
-        </header>
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 10px;
+  padding: 12px;
+}
 
-        <section className="grid two-col">
-          <div className="card">
-            <h2>Create poll</h2>
-            <label>
-              Title
-              <input value={pollTitle} onChange={(e) => setPollTitle(e.target.value)} />
-            </label>
-            <label>
-              Description
-              <textarea value={pollDescription} onChange={(e) => setPollDescription(e.target.value)} />
-            </label>
-            <label>
-              Options (comma separated)
-              <textarea value={pollOptions} onChange={(e) => setPollOptions(e.target.value)} />
-            </label>
-            <button onClick={createPoll} className="primary">Create poll</button>
-          </div>
+.option-row input {
+  width: auto;
+  margin: 0;
+}
 
-          <div className="card">
-            <h2>Poll list</h2>
-            <div className="poll-list">
-              {polls.length === 0 ? (
-                <p>No polls yet.</p>
-              ) : (
-                polls.map((poll) => (
-                  <button key={poll.id} className="poll-item" onClick={() => openPoll(poll.id)}>
-                    <strong>{poll.title}</strong>
-                    <span>{poll.total_votes} votes</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
+.results-box {
+  margin-top: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  padding-top: 16px;
+}
 
-        {selectedPollId && pollDetails && (
-          <section className="card vote-panel">
-            <h2>{pollDetails.title}</h2>
-            <p>{pollDetails.description}</p>
-            <div className="vote-form">
-              {options.map((option) => (
-                <label key={option.id} className="option-row">
-                  <input
-                    type="radio"
-                    name="voteOption"
-                    value={option.id}
-                    checked={selectedOptionId === option.id}
-                    onChange={() => setSelectedOptionId(option.id)}
-                  />
-                  <span>{option.text}</span>
-                </label>
-              ))}
-            </div>
-            <button className="primary" onClick={vote}>Submit vote</button>
-
-            {results.length > 0 && (
-              <div className="results-box">
-                <h3>Results</h3>
-                {results.map((result) => (
-                  <div key={result.id} className="result-row">
-                    <span>{result.text}</span>
-                    <strong>{result.vote_count}</strong>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-      </div>
-    </main>
-  );
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-top: 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.8);
 }
