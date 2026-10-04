@@ -55,6 +55,7 @@
           <p class="muted">基于 GitHub Issues 的轻量投票 — 团队内部快速启动</p>
         </div>
         <div class="controls">
+          <a class="btn ghost" href="./results.html" target="_blank">公开结果页</a>
           <div id="userTag" class="small">未登录</div>
           <button class="btn ghost" id="adminToggleBtn">管理员登录</button>
         </div>
@@ -137,6 +138,7 @@
                 <button class="btn primary" id="createBtn">创建投票</button>
                 <button class="btn ghost" id="refreshBtn">刷新</button>
                 <button class="btn" id="exportBtn">导出结果（CSV）</button>
+                <button class="btn" id="exportXlsxBtn">导出结果（Excel）</button>
               </div>
               <div id="adminExport" class="export-area hidden"></div>
             </div>
@@ -147,7 +149,7 @@
                 <button class="btn primary" id="saveTokenBtn">保存</button>
                 <button class="btn ghost" id="clearTokenBtn">清除</button>
               </div>
-              <div class="small muted" style="margin-top:8px">登录后本页会识别你的管理员权限并显示管理控件。</div>
+              <div class="small muted" style="margin-top:8px">登录后本页会识别你的管理员权限并显示管理控件。管理员名单也可通过 .github/admins.json 白名单控���。</div>
             </div>
           </section>
 
@@ -155,6 +157,9 @@
         </aside>
       </div>
     </div>
+
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <script>
       // state
@@ -166,6 +171,7 @@
       let selected = null;
       let currentUser = null;
       let isAdmin = false;
+      let adminWhitelist = null; // array of usernames
 
       // elements
       const userTag = document.getElementById('userTag');
@@ -194,6 +200,7 @@
       const refreshBtn = document.getElementById('refreshBtn');
       const createBtn = document.getElementById('createBtn');
       const exportBtn = document.getElementById('exportBtn');
+      const exportXlsxBtn = document.getElementById('exportXlsxBtn');
       const adminExport = document.getElementById('adminExport');
       const titleInput = document.getElementById('titleInput');
       const descInput = document.getElementById('descInput');
@@ -215,6 +222,18 @@
         return fetch('https://api.github.com' + path, Object.assign({}, opts, {headers}));
       }
 
+      async function fetchAdminWhitelist(owner, repo){
+        // try raw.githubusercontent.com to retrieve .github/admins.json
+        try{
+          const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/.github/admins.json`;
+          const r = await fetch(rawUrl);
+          if(!r.ok) return null;
+          const json = await r.json();
+          if(Array.isArray(json)) return json;
+        }catch(e){ console.warn('whitelist fetch failed', e); }
+        return null;
+      }
+
       async function whoami(){
         if(!token) return null;
         try{
@@ -227,6 +246,8 @@
       }
 
       async function checkAdminRole(){
+        // prefer whitelist if available
+        if(adminWhitelist && currentUser){ if(adminWhitelist.includes(currentUser.login)) return true; }
         if(!currentUser || !currentRepo) return false;
         const [owner, repo] = currentRepo.split('/');
         try{
@@ -234,7 +255,7 @@
           const r = await api(`/repos/${owner}/${repo}/collaborators/${currentUser.login}/permission`);
           if(!r.ok) return false;
           const j = await r.json();
-          const perm = j.permission || j.permission || j.role || '';
+          const perm = j.permission || j.role || '';
           if(perm==='admin' || perm==='maintain' || currentUser.login===owner) return true;
         }catch(e){}
         return false;
@@ -246,19 +267,20 @@
         currentRepo = val; localStorage.setItem(STORAGE.repo, currentRepo);
         themeFilter = (themeInput.value||'').trim(); localStorage.setItem(STORAGE.theme, themeFilter);
         setUserText('连接中...');
+        const [owner, repo] = currentRepo.split('/');
+        adminWhitelist = await fetchAdminWhitelist(owner, repo);
         await whoami();
         isAdmin = await checkAdminRole();
-        if(isAdmin){ showAdminUI(); adminLogin.classList.add('hidden'); } else { hideAdminUI(); }
+        if(isAdmin){ showAdminUI(); connectMsg.textContent='已连接（管理员）'; } else { hideAdminUI(); connectMsg.textContent='已连接（普通）'; }
         await refresh();
       }
 
       async function listIssues(){
         if(!currentRepo) return [];
         const [owner, repo] = currentRepo.split('/');
-        const r = await api(`/repos/${owner}/${repo}/issues?state=open&per_page=100`);
+        const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=open&per_page=100`);
         if(!r.ok){ console.error('list issues', await r.text()); return []; }
         const data = await r.json();
-        // filter out PRs
         return data.filter(i=>!i.pull_request);
       }
 
@@ -276,7 +298,6 @@
         try{
           const issues = await listIssues();
           const pollsAll = issues.map(parseIssueToPoll).filter(p=>p.options && p.options.length>0);
-          // apply theme filter if provided
           const filtered = themeFilter?pollsAll.filter(p=>p.title.includes(themeFilter) || p.title.includes('投票')):pollsAll;
           polls = filtered;
           renderPolls();
@@ -310,43 +331,40 @@
         });
         resultsArea.classList.add('hidden');
         voteNote.textContent = '';
-        // disable submit until user login
         await whoami();
         if(!currentUser){ voteNote.textContent='请用 GitHub Token 登录以投票'; }
         else{ voteNote.textContent='你已登录，可投票（每人仅一次）'; }
       }
 
+      async function fetchComments(owner, repo, issueNumber){
+        const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=500`);
+        if(!r.ok) return []; return await r.json();
+      }
+
       async function showResults(){
         if(!selected) return;
         const [owner, repo] = currentRepo.split('/');
-        const r = await api(`/repos/${owner}/${repo}/issues/${selected.id}/comments?per_page=200`);
-        if(!r.ok){ alert('读取结果失败'); return; }
-        const comments = await r.json();
-        // aggregate
+        const comments = await fetchComments(owner, repo, selected.id);
         const counts = Array(selected.options.length).fill(0);
         const voters = new Set();
+        const rows = [];
         comments.forEach(c=>{
           const m = (c.body||'').match(/\/vote\s+(\d+)/i);
-          if(m){ const v = Number(m[1]); const user = c.user && c.user.login; if(!voters.has(user)){ voters.add(user); if(v>=1 && v<=counts.length) counts[v-1]++; }}
+          if(m){ const v = Number(m[1]); const user = c.user && c.user.login; if(!voters.has(user)){ voters.add(user); if(v>=1 && v<=counts.length) counts[v-1]++; rows.push({voter:user, choice:v, option:selected.options[v-1]||''}); }}
         });
-        // render
         resultsArea.classList.remove('hidden');
-        resultsArea.innerHTML = `<h4>结果 · ${voters.size} 人参与</h4>` + selected.options.map((o,i)=>`<div class="result-row"><div>${escape(o)}</div><div style="font-weight:700">${counts[i]} 票</div></div>`).join('');
+        resultsArea.innerHTML = `<h4>结果 · ${voters.size} 人参与</h4>` + selected.options.map((o,i)=>`<div class="result-row"><div>${escape(o)}</div><div style="font-weight:700">${counts[i]} 票</div></div>`).join('') + `<div style="margin-top:8px"><button class="btn ghost" id="exportPollXlsx">导出此投票为 Excel</button></div>`;
+        document.getElementById('exportPollXlsx').addEventListener('click', ()=>exportXlsx(rows, `${selected.title.replace(/[^a-z0-9]/gi,'_')}_results.xlsx`));
       }
 
       async function submitVoteHandler(){
         if(!selected) return; const choice = document.querySelector('input[name=choice]:checked'); if(!choice) return alert('请选择一个选项');
         const value = Number(choice.value);
-        // require currentUser
         await whoami(); if(!currentUser) return alert('请先使用 GitHub Token 登录后再投票');
-        // check duplicate
         const [owner, repo] = currentRepo.split('/');
-        const r = await api(`/repos/${owner}/${repo}/issues/${selected.id}/comments?per_page=200`);
-        if(!r.ok) return alert('无法读取投票记录');
-        const comments = await r.json();
+        const comments = await fetchComments(owner, repo, selected.id);
         const has = comments.some(c=>c.user && c.user.login===currentUser.login && /\/vote\s+\d+/i.test(c.body||''));
         if(has) return alert('你已投过票，不能重复投票');
-        // post comment
         const post = await api(`/repos/${owner}/${repo}/issues/${selected.id}/comments`, {method:'POST', body:JSON.stringify({body:`/vote ${value}`})});
         if(!post.ok){ const txt = await post.text(); return alert('投票失败：'+txt); }
         alert('投票成功');
@@ -377,23 +395,31 @@
         if(!isAdmin) return alert('仅管理员可导出');
         if(!selected) return alert('请先打开要导出的投票');
         const [owner, repo] = currentRepo.split('/');
-        const r = await api(`/repos/${owner}/${repo}/issues/${selected.id}/comments?per_page=500`);
-        if(!r.ok) return alert('无法读取评论');
-        const comments = await r.json();
-        const rows = [];
-        const counts = Array(selected.options.length).fill(0);
-        const seen = new Set();
-        for(const c of comments){
-          const m = (c.body||'').match(/\/vote\s+(\d+)/i);
-          if(!m) continue; const v=Number(m[1]); const u=c.user&&c.user.login||'unknown';
-          if(seen.has(u)) continue; seen.add(u); if(v>=1 && v<=counts.length) counts[v-1]++;
-          rows.push([u, v, (selected.options[v-1]||'')]);
-        }
-        // CSV
-        const header = ['voter,choice,text'];
-        const csv = ["voter,choice,option"].concat(rows.map(r=>`${r[0]},${r[1]},"${r[2].replace(/"/g,'""')}"`)).join('\n');
+        const comments = await fetchComments(owner, repo, selected.id);
+        const rows = []; const seen = new Set();
+        for(const c of comments){ const m=(c.body||'').match(/\/vote\s+(\d+)/i); if(!m) continue; const v=Number(m[1]); const u=c.user&&c.user.login||'unknown'; if(seen.has(u)) continue; seen.add(u); rows.push({voter:u, choice:v, option:selected.options[v-1]||''}); }
+        const csv = ['voter,choice,option'].concat(rows.map(r=>`${r.voter},${r.choice},"${(r.option||'').replace(/"/g,'""')}"`)).join('\n');
         adminExport.classList.remove('hidden'); adminExport.textContent = csv;
       });
+
+      exportXlsxBtn.addEventListener('click', async ()=>{
+        if(!isAdmin) return alert('仅管理员可导出');
+        if(!selected) return alert('请先打开要导出的投票');
+        // reuse exportBtn logic to build rows
+        const [owner, repo] = currentRepo.split('/');
+        const comments = await fetchComments(owner, repo, selected.id);
+        const rows = []; const seen = new Set();
+        for(const c of comments){ const m=(c.body||'').match(/\/vote\s+(\d+)/i); if(!m) continue; const v=Number(m[1]); const u=c.user&&c.user.login||'unknown'; if(seen.has(u)) continue; seen.add(u); rows.push({voter:u, choice:v, option:selected.options[v-1]||''}); }
+        exportXlsx(rows, (selected.title||'poll') + '_results.xlsx');
+      });
+
+      function exportXlsx(rows, filename='results.xlsx'){
+        try{
+          const ws = XLSX.utils.json_to_sheet(rows);
+          const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Results');
+          XLSX.writeFile(wb, filename);
+        }catch(e){ alert('导出失败: ' + e.message); }
+      }
 
       submitVote.addEventListener('click', submitVoteHandler);
       viewResults.addEventListener('click', showResults);
