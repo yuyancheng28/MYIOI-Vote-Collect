@@ -1,556 +1,416 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MYIOI 投票系统</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>MYIOI — 团队投票</title>
+    <meta name="description" content="团队内部轻量投票（使用 GitHub Issues 存储）" />
     <style>
-      :root {
-        --bg: #0f172a;
-        --panel: #111827;
-        --panel-2: #1f2937;
-        --line: rgba(148, 163, 184, 0.2);
-        --text: #f8fafc;
-        --muted: #cbd5e1;
-        --primary: #60a5fa;
-        --primary-2: #a78bfa;
-        --success: #34d399;
-        --danger: #f87171;
+      /* 简洁且专业的样式，面向团队内使用 */
+      :root{
+        --bg:#071126;--card:#071a2b;--muted:#94a3b8;--panel:#0b1830;--accent1:#38bdf8;--accent2:#8b5cf6;--glass:rgba(255,255,255,0.03);
+        --success:#10b981;--danger:#ef4444;--text:#e6eef8;--soft:#cbd5e1;
       }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: linear-gradient(135deg, #0f172a, #111827);
-        color: var(--text);
-      }
-      .wrap {
-        max-width: 1100px;
-        margin: 40px auto;
-        padding: 20px;
-      }
-      .card {
-        background: rgba(17,24,39,0.9);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.35);
-        padding: 24px;
-        margin-bottom: 24px;
-      }
-      h1, h2, h3, p { margin-top: 0; }
-      .topbar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-        flex-wrap: wrap;
-      }
-      .title {
-        font-size: clamp(2rem, 4vw, 3rem);
-        font-weight: 800;
-        margin: 0;
-      }
-      .sub {
-        color: var(--muted);
-        margin-top: 8px;
-      }
-      .badge {
-        padding: 10px 16px;
-        border-radius: 999px;
-        background: linear-gradient(135deg, var(--primary), var(--primary-2));
-        color: white;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: 1.1fr 0.9fr;
-        gap: 24px;
-      }
-      @media (max-width: 900px) {
-        .grid { grid-template-columns: 1fr; }
-      }
-      label {
-        display: block;
-        font-size: 0.98rem;
-        color: var(--muted);
-        margin-bottom: 12px;
-      }
-      input, textarea, select, button {
-        width: 100%;
-        display: block;
-        border-radius: 12px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-        background: rgba(15, 23, 42, 0.85);
-        color: var(--text);
-        padding: 12px 14px;
-        font-size: 1rem;
-      }
-      input, textarea, select { margin-top: 8px; }
-      textarea { min-height: 110px; resize: vertical; }
-      button {
-        cursor: pointer;
-        border: none;
-        font-weight: 700;
-        transition: transform 0.18s ease, opacity 0.18s ease;
-      }
-      button:hover { transform: translateY(-1px); }
-      .primary {
-        background: linear-gradient(135deg, var(--primary), var(--primary-2));
-        color: white;
-      }
-      .danger {
-        background: linear-gradient(135deg, #ef4444, #f97316);
-        color: white;
-      }
-      .secondary {
-        background: #334155;
-        color: white;
-      }
-      .inline {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .inline > * { flex: 1 1 200px; }
-      .muted { color: var(--muted); }
-      .list {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .poll-item {
-        background: rgba(31, 41, 55, 0.92);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 14px 16px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-      }
-      .poll-title { font-weight: 700; }
-      .small { font-size: 0.86rem; color: var(--muted); }
-      .vote-box {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .option {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        background: rgba(15, 23, 42, 0.8);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 14px 16px;
-      }
-      .option input { width: auto; margin: 0; }
-      .result-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 14px;
-        background: rgba(15, 23, 42, 0.8);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        margin-bottom: 10px;
-      }
-      .notice {
-        background: rgba(52, 211, 153, 0.12);
-        color: #d1fae5;
-        border: 1px solid rgba(52, 211, 153, 0.4);
-        border-radius: 12px;
-        padding: 12px 14px;
-        margin-top: 10px;
-      }
-      .dangerbox {
-        background: rgba(248, 113, 113, 0.08);
-        border: 1px solid rgba(248, 113, 113, 0.3);
-        color: #fecaca;
-        border-radius: 12px;
-        padding: 12px 14px;
-        margin-top: 8px;
-      }
-      .hidden { display: none !important; }
+      *{box-sizing:border-box}
+      html,body{height:100%}
+      body{margin:0;background:linear-gradient(180deg,#031029 0%, #071126 60%);font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;color:var(--text);}
+      .wrap{max-width:1100px;margin:28px auto;padding:20px}
+      header.site{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+      .brand{display:flex;flex-direction:column}
+      .brand h1{margin:0;font-size:1.6rem;letter-spacing:-0.02em}
+      .brand p{margin:6px 0 0;color:var(--muted);font-size:0.9rem}
+      .controls{display:flex;gap:10px;align-items:center}
+      .btn{padding:10px 14px;border-radius:12px;border:none;cursor:pointer;font-weight:600}
+      .btn.primary{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#062433}
+      .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--soft)}
+      .layout{display:grid;grid-template-columns:1fr 360px;gap:20px}
+      @media(max-width:980px){.layout{grid-template-columns:1fr}}
+      .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,0.03)}
+      .muted{color:var(--muted)}
+      label{display:block;font-size:0.9rem;color:var(--muted);margin-bottom:8px}
+      input,textarea,select{width:100%;padding:10px;border-radius:10px;background:var(--panel);border:1px solid rgba(255,255,255,0.03);color:var(--text)}
+      textarea{min-height:100px}
+      .cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+      .poll-list{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+      .poll{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px;border-radius:10px;background:var(--card);border:1px solid rgba(255,255,255,0.02)}
+      .poll .meta{color:var(--muted);font-size:0.9rem}
+      .small{font-size:0.9rem;color:var(--muted)}
+      .option{display:flex;gap:12px;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border:1px solid rgba(255,255,255,0.02)}
+      .option input{width:auto}
+      .notice{background:linear-gradient(180deg, rgba(56,189,248,0.08), rgba(139,92,246,0.04));padding:12px;border-radius:10px;color:var(--soft);border:1px solid rgba(255,255,255,0.02)}
+      .hr{height:1px;background:rgba(255,255,255,0.02);margin:12px 0;border-radius:2px}
+      .center{display:flex;gap:8px;align-items:center}
+      .pill{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.04);font-weight:600}
+      .hidden{display:none}
+      .admin-badge{background:linear-gradient(90deg,#fde68a,#fb923c);padding:6px 10px;border-radius:999px;color:#041014;font-weight:700}
+      .export-area{white-space:pre-wrap;font-family:monospace;background:rgba(255,255,255,0.02);padding:12px;border-radius:8px;margin-top:10px}
+      footer.small{margin-top:18px;color:var(--muted);font-size:0.9rem}
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="topbar card">
-        <div>
-          <p class="badge">MYIOI 投票平台</p>
-          <h1 class="title">团队在线投票</h1>
-          <p class="sub">基于 GitHub Issues / Token 的集中投票记录（适合团队内部快速使用）</p>
+      <header class="site">
+        <div class="brand">
+          <h1>MYIOI 团队投票</h1>
+          <p class="muted">基于 GitHub Issues 的轻量投票 — 团队内部快速启动</p>
         </div>
-        <div class="small" id="statusBox">未连接</div>
-      </div>
-
-      <div class="grid">
-        <div class="card">
-          <h2>1. 登录到 GitHub（管理员）</h2>
-          <label>
-            GitHub Token（仓库 issues 权限）
-            <input id="tokenInput" type="password" placeholder="ghp_xxx 或 github_pat_xxx" />
-          </label>
-          <div class="inline">
-            <button class="primary" id="saveTokenBtn">保存 Token</button>
-            <button class="secondary" id="clearTokenBtn">清空 Token</button>
-          </div>
-          <div class="notice" id="tokenNotice">
-            说明：填写 token 后，页面可读取/新增仓库 Issue 来作为投票记录；推荐仅给 repo:issues 相关权限，避免超范围权限。
-          </div>
+        <div class="controls">
+          <div id="userTag" class="small">未登录</div>
+          <button class="btn ghost" id="adminToggleBtn">管理员登录</button>
         </div>
+      </header>
 
-        <div class="card">
-          <h2>2. 仓库配置</h2>
-          <label>
-            GitHub 仓库（owner/repo）
-            <input id="repoInput" value="yuyancheng28/MYIOI-Vote-Collect" />
-          </label>
-          <label>
-            主题标题（例：洛谷团队内部投票）
-            <input id="themeInput" value="洛谷团队内部投票" />
-          </label>
-          <div class="inline">
-            <button class="primary" id="connectRepoBtn">连接仓库</button>
-            <button class="secondary" id="refreshPollsBtn">刷新投票列表</button>
-          </div>
-        </div>
-      </div>
+      <div class="layout">
+        <main>
+          <section class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <h2 style="margin:0">投票面板</h2>
+                <div class="small">选择一个投票，或创建新投票（管理员）</div>
+              </div>
+              <div class="center">
+                <div id="roleBadge" class="pill hidden">普通成员</div>
+                <div id="adminBadge" class="admin-badge hidden">管理员</div>
+              </div>
+            </div>
 
-      <div class="card">
-        <h2>3. 创建投票</h2>
-        <div class="grid">
-          <div>
-            <label>
-              标题
-              <input id="pollTitleInput" placeholder="例如：本周技术分享主题投票" />
-            </label>
-            <label>
-              描述
-              <textarea id="pollDescInput" placeholder="例如：请选择你最想参加的主题"></textarea>
-            </label>
-          </div>
-          <div>
-            <label>
-              选项（每行一个）
-              <textarea id="pollOptionsInput" placeholder="Python 进阶&#10;算法竞赛&#10;前端工程化"></textarea>
-            </label>
-            <button class="primary" id="createPollBtn">创建投票</button>
-          </div>
-        </div>
-      </div>
+            <div class="hr"></div>
 
-      <div class="card">
-        <h2>4. 当前投票</h2>
-        <div id="pollList" class="list"></div>
-      </div>
+            <div id="pollContainer">
+              <div id="pollList" class="poll-list"></div>
+              <div id="emptyHint" class="small muted">暂无投票。管理员可在右侧创建投票。</div>
+            </div>
 
-      <div class="card hidden" id="votePanel">
-        <h2 id="selectedPollTitle">投票详情</h2>
-        <p id="selectedPollDesc" class="muted"></p>
-        <div id="voteOptions" class="vote-box"></div>
-        <div class="inline" style="margin-top: 20px;">
-          <button class="primary" id="submitVoteBtn">提交投票</button>
-          <button class="secondary" id="showResultsBtn">查看结果</button>
-        </div>
-        <div id="resultsBox" class="hidden" style="margin-top: 18px;"></div>
+            <div id="votePanel" class="hidden" style="margin-top:14px">
+              <h3 id="vpTitle" style="margin:0">投票</h3>
+              <div id="vpDesc" class="small muted" style="margin-top:6px"></div>
+              <div id="vpOptions" style="margin-top:10px;display:flex;flex-direction:column;gap:8px"></div>
+              <div class="hr"></div>
+              <div style="display:flex;gap:10px">
+                <button class="btn primary" id="submitVote">提交投票</button>
+                <button class="btn ghost" id="viewResults">查看结果</button>
+                <div class="small muted" id="voteNote" style="align-self:center;margin-left:auto"></div>
+              </div>
+              <div id="resultsArea" class="hidden" style="margin-top:12px"></div>
+            </div>
+          </section>
+
+          <section class="card" style="margin-top:14px">
+            <h3 style="margin:0">快速说明</h3>
+            <div class="small muted" style="margin-top:8px">本页把每个投票记录为仓库中的一个 Issue；投票以 Issue 评论的形式记录（格式 <code>/vote 1</code>）。</div>
+            <div class="hr"></div>
+            <div class="small muted">投票方式：</div>
+            <ol class="small muted">
+              <li>管理员登录（一次性）并创建投票；</li>
+              <li>成员打开页面并使用 <strong>个人 GitHub Token</strong> 登录以投票（也可由管理员代投）；</li>
+              <li>系统会根据 GitHub 用户名防止重复投票；</li>
+            </ol>
+            <div class="hr"></div>
+            <div class="small muted">安全建议：不要把你的长期全权限 Token 粘贴到公共电脑。建议使用短期或最小 scope 的 token（repo:issues）。</div>
+          </section>
+
+        </main>
+
+        <aside>
+          <section class="card">
+            <h3 style="margin:0">仓库设置</h3>
+            <div class="small muted" style="margin-top:8px">仓库 owner/repo</div>
+            <div style="margin-top:10px">
+              <input id="repoInput" placeholder="owner/repo" />
+            </div>
+            <div style="margin-top:10px">
+              <button class="btn primary" id="connectBtn">连接仓库</button>
+            </div>
+            <div id="connectMsg" class="small muted" style="margin-top:10px">请先连接仓库以读取投票。</div>
+          </section>
+
+          <section class="card" style="margin-top:14px">
+            <h3 style="margin:0">管理员面板</h3>
+            <div class="small muted" style="margin-top:8px">（仅管理员可见）</div>
+
+            <div id="adminControls" class="hidden">
+              <label>投票主题（用于筛选，可留空）<input id="themeInput" placeholder="如：洛谷团队投票"/></label>
+              <label style="margin-top:8px">投票标题<input id="titleInput" placeholder="例如：本周分享主题"/></label>
+              <label style="margin-top:8px">描述<textarea id="descInput" placeholder="投票说明"></textarea></label>
+              <label style="margin-top:8px">选项（每行一个）<textarea id="optsInput" placeholder="选项 1\n选项 2\n选项 3"></textarea></label>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn primary" id="createBtn">创建投票</button>
+                <button class="btn ghost" id="refreshBtn">刷新</button>
+                <button class="btn" id="exportBtn">导出结果（CSV）</button>
+              </div>
+              <div id="adminExport" class="export-area hidden"></div>
+            </div>
+
+            <div id="adminLogin" style="margin-top:10px">
+              <label>管理员 Token（仅管理员需要）<input id="tokenInput" placeholder="粘贴 GitHub Token（repo:issues）"/></label>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn primary" id="saveTokenBtn">保存</button>
+                <button class="btn ghost" id="clearTokenBtn">清除</button>
+              </div>
+              <div class="small muted" style="margin-top:8px">登录后本页会识别你的管理员权限并显示管理控件。</div>
+            </div>
+          </section>
+
+          <footer class="small" style="margin-top:14px">构建者：MYIOI · 使用 GitHub Issues 作为后端（仅团队内部使用）</footer>
+        </aside>
       </div>
     </div>
 
     <script>
-      const TOKEN_KEY = 'myioi_token';
-      const REPO_KEY = 'myioi_repo';
-      const THEME_KEY = 'myioi_theme';
-      let currentRepo = localStorage.getItem(REPO_KEY) || 'yuyancheng28/MYIOI-Vote-Collect';
-      let token = localStorage.getItem(TOKEN_KEY) || '';
-      let pollList = [];
-      let selectedPoll = null;
-      let selectedOption = null;
+      // state
+      const STORAGE = { token: 'myioi_token_v2', repo: 'myioi_repo_v2', theme: 'myioi_theme_v2' };
+      let token = localStorage.getItem(STORAGE.token) || '';
+      let currentRepo = localStorage.getItem(STORAGE.repo) || '';
+      let themeFilter = localStorage.getItem(STORAGE.theme) || '';
+      let polls = [];
+      let selected = null;
       let currentUser = null;
+      let isAdmin = false;
 
-      const tokenInput = document.getElementById('tokenInput');
+      // elements
+      const userTag = document.getElementById('userTag');
+      const adminToggleBtn = document.getElementById('adminToggleBtn');
       const repoInput = document.getElementById('repoInput');
-      const themeInput = document.getElementById('themeInput');
-      const pollTitleInput = document.getElementById('pollTitleInput');
-      const pollDescInput = document.getElementById('pollDescInput');
-      const pollOptionsInput = document.getElementById('pollOptionsInput');
+      const connectBtn = document.getElementById('connectBtn');
+      const connectMsg = document.getElementById('connectMsg');
       const pollListEl = document.getElementById('pollList');
+      const emptyHint = document.getElementById('emptyHint');
       const votePanel = document.getElementById('votePanel');
-      const selectedPollTitle = document.getElementById('selectedPollTitle');
-      const selectedPollDesc = document.getElementById('selectedPollDesc');
-      const voteOptionsEl = document.getElementById('voteOptions');
-      const resultsBox = document.getElementById('resultsBox');
-      const statusBox = document.getElementById('statusBox');
+      const vpTitle = document.getElementById('vpTitle');
+      const vpDesc = document.getElementById('vpDesc');
+      const vpOptions = document.getElementById('vpOptions');
+      const submitVote = document.getElementById('submitVote');
+      const viewResults = document.getElementById('viewResults');
+      const voteNote = document.getElementById('voteNote');
+      const resultsArea = document.getElementById('resultsArea');
+      const roleBadge = document.getElementById('roleBadge');
+      const adminBadge = document.getElementById('adminBadge');
 
+      const adminControls = document.getElementById('adminControls');
+      const adminLogin = document.getElementById('adminLogin');
+      const tokenInput = document.getElementById('tokenInput');
+      const saveTokenBtn = document.getElementById('saveTokenBtn');
+      const clearTokenBtn = document.getElementById('clearTokenBtn');
+      const refreshBtn = document.getElementById('refreshBtn');
+      const createBtn = document.getElementById('createBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const adminExport = document.getElementById('adminExport');
+      const titleInput = document.getElementById('titleInput');
+      const descInput = document.getElementById('descInput');
+      const optsInput = document.getElementById('optsInput');
+      const themeInput = document.getElementById('themeInput');
+
+      // initialize
+      repoInput.value = currentRepo || 'yuyancheng28/MYIOI-Vote-Collect';
       tokenInput.value = token;
-      repoInput.value = currentRepo;
-      themeInput.value = localStorage.getItem(THEME_KEY) || '洛谷团队内部投票';
+      themeInput.value = themeFilter || '';
 
-      function setStatus(msg) {
-        statusBox.textContent = msg;
+      function setUserText(txt){ userTag.textContent = txt || '未登录'; }
+      function showAdminUI(){ adminControls.classList.remove('hidden'); adminLogin.classList.add('hidden'); adminBadge.classList.remove('hidden'); roleBadge.classList.add('hidden'); }
+      function hideAdminUI(){ adminControls.classList.add('hidden'); adminLogin.classList.remove('hidden'); adminBadge.classList.add('hidden'); roleBadge.classList.remove('hidden'); }
+
+      function api(path, opts={}){
+        const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+        if(token) headers.Authorization = 'Bearer ' + token;
+        return fetch('https://api.github.com' + path, Object.assign({}, opts, {headers}));
       }
 
-      function saveToken() {
-        token = tokenInput.value.trim();
-        if (!token) {
-          alert('请输入 GitHub Token');
-          return;
-        }
-        localStorage.setItem(TOKEN_KEY, token);
-        setStatus('Token 已保存');
+      async function whoami(){
+        if(!token) return null;
+        try{
+          const r = await api('/user');
+          if(!r.ok) throw new Error('Invalid token');
+          currentUser = await r.json();
+          setUserText(currentUser.login);
+          return currentUser;
+        }catch(e){ setUserText('未登录'); currentUser=null; return null; }
       }
 
-      function clearToken() {
-        token = '';
-        tokenInput.value = '';
-        localStorage.removeItem(TOKEN_KEY);
-        setStatus('Token 已清空');
-      }
-
-      function saveRepo() {
-        currentRepo = repoInput.value.trim();
-        if (!currentRepo) return alert('请输入 owner/repo');
-        localStorage.setItem(REPO_KEY, currentRepo);
-        localStorage.setItem(THEME_KEY, themeInput.value.trim());
-        setStatus('仓库已连接');
-      }
-
-      function api(path, options = {}) {
-        const headers = {
-          'Content-Type': 'application/json',
-          ...(options.headers || {}),
-        };
-        if (token) headers.Authorization = `Bearer ${token}`;
-        return fetch(`https://api.github.com${path}`, { ...options, headers });
-      }
-
-      async function fetchCurrentUser() {
-        try {
-          const res = await api('/user');
-          if (!res.ok) throw new Error('GitHub token 无效');
-          const data = await res.json();
-          currentUser = data.login;
-          setStatus(`已连接：${data.login}`);
-          return data;
-        } catch (e) {
-          setStatus('Token 或仓库访问失败');
-          throw e;
-        }
-      }
-
-      async function listIssues() {
+      async function checkAdminRole(){
+        if(!currentUser || !currentRepo) return false;
         const [owner, repo] = currentRepo.split('/');
-        if (!owner || !repo) return alert('仓库格式错误，必须是 owner/repo');
-        const res = await api(`/repos/${owner}/${repo}/issues?state=all&per_page=100`);
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || '无法读取 issues');
-        }
-        const issues = await res.json();
-        return issues.filter(i => !i.pull_request);
+        try{
+          // check collaborator permission
+          const r = await api(`/repos/${owner}/${repo}/collaborators/${currentUser.login}/permission`);
+          if(!r.ok) return false;
+          const j = await r.json();
+          const perm = j.permission || j.permission || j.role || '';
+          if(perm==='admin' || perm==='maintain' || currentUser.login===owner) return true;
+        }catch(e){}
+        return false;
       }
 
-      function parsePoll(issue) {
+      async function connectRepo(){
+        const val = repoInput.value.trim();
+        if(!val) return alert('请输入 owner/repo');
+        currentRepo = val; localStorage.setItem(STORAGE.repo, currentRepo);
+        themeFilter = (themeInput.value||'').trim(); localStorage.setItem(STORAGE.theme, themeFilter);
+        setUserText('连接中...');
+        await whoami();
+        isAdmin = await checkAdminRole();
+        if(isAdmin){ showAdminUI(); adminLogin.classList.add('hidden'); } else { hideAdminUI(); }
+        await refresh();
+      }
+
+      async function listIssues(){
+        if(!currentRepo) return [];
+        const [owner, repo] = currentRepo.split('/');
+        const r = await api(`/repos/${owner}/${repo}/issues?state=open&per_page=100`);
+        if(!r.ok){ console.error('list issues', await r.text()); return []; }
+        const data = await r.json();
+        // filter out PRs
+        return data.filter(i=>!i.pull_request);
+      }
+
+      function parseIssueToPoll(issue){
+        // Expect body contains lines: 1. option
         const body = issue.body || '';
-        const lines = body.split(/\r?\n/);
-        const title = issue.title;
-        const description = lines.find(line => line.startsWith('描述:'))?.replace(/^描述:\s*/, '') || '';
-        const options = [];
-        for (const line of lines) {
-          const m = line.match(/^\d+\.\s*(.+)$/);
-          if (m) options.push(m[1]);
-        }
-        return { issueNumber: issue.number, title, description, options, issueUrl: issue.html_url };
+        const lines = body.split(/\r?\n/).map(l=>l.trim());
+        const options = lines.filter(l=>/^\d+\./.test(l)).map(l=>l.replace(/^\d+\.\s*/,''));
+        const descLine = lines.find(l=>l.startsWith('描述:'));
+        const desc = descLine?descLine.replace(/^描述:\s*/,'') : '';
+        return {id:issue.number, title:issue.title, desc, options, url:issue.html_url};
       }
 
-      async function refreshPolls() {
-        try {
+      async function refresh(){
+        try{
           const issues = await listIssues();
-          pollList = issues
-            .map(parsePoll)
-            .filter(p => p.options.length > 0)
-            .filter(p => p.title.includes(themeInput.value.trim()) || p.title.includes('投票'));
-
-          renderPollList();
-        } catch (e) {
-          console.error(e);
-          alert('读取投票列表失败：请确认 token 有 repo issues 权限，并且仓库正确。');
-        }
+          const pollsAll = issues.map(parseIssueToPoll).filter(p=>p.options && p.options.length>0);
+          // apply theme filter if provided
+          const filtered = themeFilter?pollsAll.filter(p=>p.title.includes(themeFilter) || p.title.includes('投票')):pollsAll;
+          polls = filtered;
+          renderPolls();
+        }catch(e){ console.error(e); }
       }
 
-      function renderPollList() {
-        if (!pollList.length) {
-          pollListEl.innerHTML = '<div class="small">暂无投票，先创建一个。</div>';
-          return;
+      function renderPolls(){
+        pollListEl.innerHTML = '';
+        if(polls.length===0){ emptyHint.classList.remove('hidden'); return; } else emptyHint.classList.add('hidden');
+        for(const p of polls){
+          const el = document.createElement('div'); el.className='poll';
+          el.innerHTML = `<div><div class="poll-title">${escape(p.title)}</div><div class="meta small">#${p.id} · ${p.options.length} 个选项</div></div>
+            <div style="display:flex;gap:8px"><button class="btn ghost" data-open="${p.id}">查看/投票</button></div>`;
+          pollListEl.appendChild(el);
         }
-        pollListEl.innerHTML = pollList.map(p => `
-          <div class="poll-item" data-id="${p.issueNumber}">
-            <div>
-              <div class="poll-title">${escapeHtml(p.title)}</div>
-              <div class="small">${p.options.length} 个选项 · #${p.issueNumber}</div>
-            </div>
-            <button class="secondary" data-open="${p.issueNumber}">进入</button>
-          </div>
-        `).join('');
-
-        document.querySelectorAll('[data-open]').forEach(btn => {
-          btn.onclick = () => openPollByNumber(Number(btn.getAttribute('data-open')));
-        });
+        pollListEl.querySelectorAll('[data-open]').forEach(btn=>btn.addEventListener('click', ()=>openPoll(Number(btn.getAttribute('data-open')))));
       }
 
-      async function createPoll() {
-        const [owner, repo] = currentRepo.split('/');
-        if (!token) return alert('请先保存 GitHub Token');
+      function escape(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-        const title = document.getElementById('pollTitleInput').value.trim();
-        const description = document.getElementById('pollDescInput').value.trim();
-        const optionsText = document.getElementById('pollOptionsInput').value.trim();
-        if (!title || !optionsText) return alert('标题和选项不能为空');
-
-        const options = optionsText.split(/\n+/).map(x => x.trim()).filter(Boolean);
-        if (options.length < 2) return alert('至少填写两个选项');
-
-        const body = [
-          `标题: ${themeInput.value.trim()}`,
-          `描述: ${description || '暂无说明'}`,
-          '',
-          '投票规则：',
-          '1. 请在评论区输入 /vote 1 /vote 2 这种格式',
-          '2. 每个 GitHub 用户只能投一次',
-          '',
-          '选项：',
-          ...options.map((o, idx) => `${idx + 1}. ${o}`),
-        ].join('\n');
-
-        const res = await api(`/repos/${owner}/${repo}/issues`, {
-          method: 'POST',
-          body: JSON.stringify({ title, body, labels: ['vote'] })
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          return alert('创建失败：' + txt);
-        }
-        await refreshPolls();
-        alert('投票创建成功');
-      }
-
-      async function openPollByNumber(num) {
-        const issues = await listIssues();
-        const issue = issues.find(i => i.number === num);
-        if (!issue) return alert('投票不存在');
-        selectedPoll = parsePoll(issue);
-        selectedPollTitle.textContent = selectedPoll.title;
-        selectedPollDesc.textContent = selectedPoll.description || '暂无描述';
+      async function openPoll(num){
+        selected = polls.find(x=>x.id===num);
+        if(!selected){ alert('投票未找到，刷新后重试'); return; }
         votePanel.classList.remove('hidden');
-
-        voteOptionsEl.innerHTML = selectedPoll.options.map((opt, idx) => `
-          <label class="option">
-            <input type="radio" name="choice" value="${idx + 1}" />
-            <span>${idx + 1}. ${escapeHtml(opt)}</span>
-          </label>
-        `).join('');
-
-        document.querySelectorAll('input[name="choice"]').forEach(r => {
-          r.onclick = () => { selectedOption = Number(r.value); };
+        vpTitle.textContent = selected.title; vpDesc.textContent = selected.desc || '';
+        vpOptions.innerHTML = '';
+        selected.options.forEach((opt, idx)=>{
+          const r = document.createElement('label'); r.className='option';
+          r.innerHTML = `<input type="radio" name="choice" value="${idx+1}"/> <div>${idx+1}. ${escape(opt)}</div>`;
+          vpOptions.appendChild(r);
         });
-
-        resultsBox.classList.add('hidden');
-        document.getElementById('showResultsBtn').onclick = () => showResults();
-        document.getElementById('submitVoteBtn').onclick = () => submitVote();
+        resultsArea.classList.add('hidden');
+        voteNote.textContent = '';
+        // disable submit until user login
+        await whoami();
+        if(!currentUser){ voteNote.textContent='请用 GitHub Token 登录以投票'; }
+        else{ voteNote.textContent='你已登录，可投票（每人仅一次）'; }
       }
 
-      async function showResults() {
-        if (!selectedPoll) return;
+      async function showResults(){
+        if(!selected) return;
         const [owner, repo] = currentRepo.split('/');
-        const commentsRes = await api(`/repos/${owner}/${repo}/issues/${selectedPoll.issueNumber}/comments?per_page=100`);
-        if (!commentsRes.ok) return alert('读取投票结果失败');
-        const comments = await commentsRes.json();
-
-        const counts = selectedPoll.options.map(() => 0);
+        const r = await api(`/repos/${owner}/${repo}/issues/${selected.id}/comments?per_page=200`);
+        if(!r.ok){ alert('读取结果失败'); return; }
+        const comments = await r.json();
+        // aggregate
+        const counts = Array(selected.options.length).fill(0);
         const voters = new Set();
-        for (const c of comments) {
-          const body = c.body || '';
-          const match = body.match(/\/vote\s+(\d+)/i);
-          if (!match) continue;
-          const voter = c.user && c.user.login ? c.user.login : 'unknown';
-          const num = Number(match[1]);
-          if (isNaN(num) || num < 1 || num > counts.length) continue;
-          if (voters.has(voter)) continue;
-          voters.add(voter);
-          counts[num - 1] += 1;
-        }
-
-        resultsBox.classList.remove('hidden');
-        resultsBox.innerHTML = `
-          <h3>投票结果（${voters.size} 人已投）</h3>
-          ${selectedPoll.options.map((opt, idx) => `
-            <div class="result-row">
-              <span>${escapeHtml(opt)}</span>
-              <strong>${counts[idx]} 票</strong>
-            </div>
-          `).join('')}
-        `;
+        comments.forEach(c=>{
+          const m = (c.body||'').match(/\/vote\s+(\d+)/i);
+          if(m){ const v = Number(m[1]); const user = c.user && c.user.login; if(!voters.has(user)){ voters.add(user); if(v>=1 && v<=counts.length) counts[v-1]++; }}
+        });
+        // render
+        resultsArea.classList.remove('hidden');
+        resultsArea.innerHTML = `<h4>结果 · ${voters.size} 人参与</h4>` + selected.options.map((o,i)=>`<div class="result-row"><div>${escape(o)}</div><div style="font-weight:700">${counts[i]} 票</div></div>`).join('');
       }
 
-      async function submitVote() {
-        if (!selectedPoll || !selectedOption) return alert('请先选择一项');
+      async function submitVoteHandler(){
+        if(!selected) return; const choice = document.querySelector('input[name=choice]:checked'); if(!choice) return alert('请选择一个选项');
+        const value = Number(choice.value);
+        // require currentUser
+        await whoami(); if(!currentUser) return alert('请先使用 GitHub Token 登录后再投票');
+        // check duplicate
         const [owner, repo] = currentRepo.split('/');
-        const body = `/vote ${selectedOption}`;
-
-        // check existing comments from current user
-        const commentsRes = await api(`/repos/${owner}/${repo}/issues/${selectedPoll.issueNumber}/comments?per_page=100`);
-        if (!commentsRes.ok) return alert('无法访问评论记录');
-        const comments = await commentsRes.json();
-        const currentLogin = currentUser || await fetchCurrentUser().catch(() => null);
-        if (currentLogin) {
-          const hasVoted = comments.some(c => c.user && c.user.login === currentLogin && /\/vote\s+\d+/i.test(c.body || ''));
-          if (hasVoted) {
-            alert('你已经投过票了，不能重复投票');
-            return;
-          }
-        }
-
-        const res = await api(`/repos/${owner}/${repo}/issues/${selectedPoll.issueNumber}/comments`, {
-          method: 'POST',
-          body: JSON.stringify({ body })
-        });
-
-        if (!res.ok) {
-          const txt = await res.text();
-          return alert('投票失败：' + txt);
-        }
+        const r = await api(`/repos/${owner}/${repo}/issues/${selected.id}/comments?per_page=200`);
+        if(!r.ok) return alert('无法读取投票记录');
+        const comments = await r.json();
+        const has = comments.some(c=>c.user && c.user.login===currentUser.login && /\/vote\s+\d+/i.test(c.body||''));
+        if(has) return alert('你已投过票，不能重复投票');
+        // post comment
+        const post = await api(`/repos/${owner}/${repo}/issues/${selected.id}/comments`, {method:'POST', body:JSON.stringify({body:`/vote ${value}`})});
+        if(!post.ok){ const txt = await post.text(); return alert('投票失败：'+txt); }
         alert('投票成功');
         await showResults();
       }
 
-      function escapeHtml(str) {
-        return String(str)
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#039;');
-      }
+      // admin functions
+      saveTokenBtn.addEventListener('click', async ()=>{
+        token = tokenInput.value.trim(); if(!token) return alert('请输入 token');
+        localStorage.setItem(STORAGE.token, token); await whoami(); isAdmin = await checkAdminRole(); if(isAdmin) { showAdminUI(); connectMsg.textContent='已连接（管理员）'; } else { alert('当前用户不是该仓库管理员或权限不足'); }
+      });
+      clearTokenBtn.addEventListener('click', ()=>{ token=''; localStorage.removeItem(STORAGE.token); tokenInput.value=''; hideAdminUI(); setUserText('未登录'); });
 
-      document.getElementById('saveTokenBtn').onclick = saveToken;
-      document.getElementById('clearTokenBtn').onclick = clearToken;
-      document.getElementById('connectRepoBtn').onclick = () => {
-        saveRepo();
-        fetchCurrentUser().then(refreshPolls).catch(() => {});
-      };
-      document.getElementById('refreshPollsBtn').onclick = refreshPolls;
-      document.getElementById('createPollBtn').onclick = createPoll;
+      connectBtn.addEventListener('click', connectRepo);
+      refreshBtn.addEventListener('click', refresh);
+      createBtn.addEventListener('click', async ()=>{
+        if(!isAdmin) return alert('仅管理员可创建投票');
+        const t = titleInput.value.trim(); const d = descInput.value.trim(); const opts = optsInput.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+        if(!t || opts.length<2) return alert('请输入标题并至少两个选项');
+        const bodyLines = ['描述: ' + (d||'无'), '', '选项:','', ...opts.map((o,i)=>`${i+1}. ${o}`)];
+        const [owner, repo] = currentRepo.split('/');
+        const res = await api(`/repos/${owner}/${repo}/issues`, {method:'POST', body:JSON.stringify({title:t, body:bodyLines.join('\n'), labels:['vote']})});
+        if(!res.ok){ alert('创建失败'); const txt=await res.text(); console.error(txt); return; }
+        alert('投票创建成功'); titleInput.value=''; descInput.value=''; optsInput.value=''; await refresh();
+      });
 
-      window.onload = async () => {
-        if (token) {
-          try {
-            await fetchCurrentUser();
-            await refreshPolls();
-          } catch (e) {}
+      exportBtn.addEventListener('click', async ()=>{
+        if(!isAdmin) return alert('仅管理员可导出');
+        if(!selected) return alert('请先打开要导出的投票');
+        const [owner, repo] = currentRepo.split('/');
+        const r = await api(`/repos/${owner}/${repo}/issues/${selected.id}/comments?per_page=500`);
+        if(!r.ok) return alert('无法读取评论');
+        const comments = await r.json();
+        const rows = [];
+        const counts = Array(selected.options.length).fill(0);
+        const seen = new Set();
+        for(const c of comments){
+          const m = (c.body||'').match(/\/vote\s+(\d+)/i);
+          if(!m) continue; const v=Number(m[1]); const u=c.user&&c.user.login||'unknown';
+          if(seen.has(u)) continue; seen.add(u); if(v>=1 && v<=counts.length) counts[v-1]++;
+          rows.push([u, v, (selected.options[v-1]||'')]);
         }
-      };
+        // CSV
+        const header = ['voter,choice,text'];
+        const csv = ["voter,choice,option"].concat(rows.map(r=>`${r[0]},${r[1]},"${r[2].replace(/"/g,'""')}"`)).join('\n');
+        adminExport.classList.remove('hidden'); adminExport.textContent = csv;
+      });
+
+      submitVote.addEventListener('click', submitVoteHandler);
+      viewResults.addEventListener('click', showResults);
+
+      // admin toggle prompts
+      adminToggleBtn.addEventListener('click', ()=>{
+        const visible = adminLogin.classList.contains('hidden');
+        if(visible){ adminLogin.classList.remove('hidden'); adminControls.classList.add('hidden'); } else { adminLogin.classList.remove('hidden'); adminControls.classList.add('hidden'); }
+      });
+
+      // auto-load
+      (async ()=>{
+        if(localStorage.getItem(STORAGE.token)){ token=localStorage.getItem(STORAGE.token); tokenInput.value=token; await whoami(); }
+        if(localStorage.getItem(STORAGE.repo)){ repoInput.value=localStorage.getItem(STORAGE.repo); currentRepo=localStorage.getItem(STORAGE.repo); }
+        if(localStorage.getItem(STORAGE.theme)){ themeInput.value=localStorage.getItem(STORAGE.theme); themeFilter=localStorage.getItem(STORAGE.theme); }
+        if(currentRepo){ await connectRepo(); }
+      })();
     </script>
   </body>
 </html>

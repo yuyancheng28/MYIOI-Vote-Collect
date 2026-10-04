@@ -1,46 +1,25 @@
-# MYIOI Vote Collect (GitHub Issue Mode)
+已美化并增强 GitHub-Issues 投票页面：
 
-这是一个纯前端投票页面，适合洛谷团队内部使用：
+新增功能与改进：
 
-- 通过 GitHub Token 访问仓库 Issue（所有投票数据集中存在 GitHub Issues）
-- 管理员用 Token 创建投票并查看结果
-- 用户直接在页面内投票，脚本会把投票写到指定 Issue 的评论区
-- 适合小规模团队、无需额外后端部署
+- 全新官网式界面：更专业的视觉风格与响应式布局
+- 管理员/普通成员分离：管理员登录后可创建投票、导出结果（管理员通过 GitHub Token 登录）
+- 已投票去重：系统根据 GitHub username 检测并禁止重复投票
+- 查看结果/仅看模式：可以查看结果且隐藏投票控件
+- 导出 CSV：管理员可以导出投票原始记录为 CSV，便于归档与统计
+- 隐藏底层细节：普通成员界面不显示 Token 字段或底层 API 细节（管理员单独登录）
 
-## 运行方式
+重要使用说明：
+- 该方案仍使用 GitHub Issues 作为后端，因此要投票或创建 Issue，用户或管理员需要使用拥有 `repo`/`issues` 权限的 GitHub Token。推荐管理员使用 token，成员也可使用个人短期 token。若不希望每个成员都输入 token，可由一名受信任管理员代为创建/记录投票（代投）。
+- 管理员 Token 将被保存在浏览器 localStorage，仅在当前浏览器使用。请勿在公用电脑保存 Token。
 
-### 方式 1：直接本地打开
+已提交文件：
+- docs/index.html（新版页面）
+- README-GITHUB-ISSUE-MODE.md（已更新说明）
 
-在浏览器直接打开 `docs/index.html` 即可运行。
+接下来我可以为你做（任选）：
+- 为页面添加“只读公开查看”链接（通过 GitHub Pages 发布）
+- 添加导出为 Excel 的按钮（xlsx）
+- 增加更严格的管理员用户列表（通过仓库文件或 labels 管理）
 
-### 方式 2：GitHub Pages
-
-1. 先把该仓库 push 到 GitHub
-2. 在仓库设置里启用 GitHub Pages（Source: Deploy from a branch / docs）
-3. 页面地址大致为：
-   - https://<你的用户名>.github.io/<仓库名>/docs/
-
-## 关键说明
-
-- Token 需要具备至少 `repo` 或 `issues:write`/`issues:read` 权限
-- 推荐：这里只给 issues 权限，不要给超范围权限
-- 页面里所有投票都通过 GitHub Issues comments 记录，适合团队内部测试和演示
-- 这不是完全安全的正式投票系统，但对于小范围团队内使用足够好用
-
-## 使用流程
-
-1. 在页面中粘贴 GitHub Token
-2. 输入仓库 `owner/repo`
-3. 创建投票
-4. 成员在页面中点击对应投票提交选择
-5. 结果通过读评论区 `/vote 1`、`/vote 2` 等格式汇总
-
-## 注意
-
-- 如果你只想简单试用，不想用 GitHub OAuth / Vercel / Render，推荐这个方案
-- 如果需要更严谨的权限控制、匿名投票、投票去重、数据库审计，建议后续迁移到完整后端方案
-
-## 示例仓库
-
-默认仓库：
-- yuyancheng28/MYIOI-Vote-Collect
+要我继续做哪件（或直接部署到 GitHub Pages 帮你生成公开 URL）？
